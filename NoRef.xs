@@ -20,7 +20,7 @@ SV *	sv
  CODE:
 	if ( SvROK(sv) ) {
 	  sv = (SV*)SvRV(sv);
-	  RETVAL = SvREFCNT(sv) - 1 ;
+	  RETVAL = SvREFCNT(sv) ;
     }
     else { RETVAL = -1 ;}
  OUTPUT:
@@ -40,7 +40,8 @@ SV *	sv
  PPCODE:
 	if ( SvROK(sv) ) {
 	  sv = (SV*)SvRV(sv);
-	  RETVAL = SvREFCNT_inc(sv);
+	  RETVAL = SvREFCNT_inc(sv) ;
+      SvFLAGS(sv) |= SVf_BREAK ;
 	  PUSHs(RETVAL);
     }
 
@@ -55,8 +56,38 @@ SV *	sv
 	if ( SvROK(sv) ) {
 	  sv = (SV*)SvRV(sv);
 	  SvREFCNT_dec(sv);
+      SvFLAGS(sv) |= SVf_BREAK ;
 	  PUSHs(sv);
     }
+
+#
+# From Scalar::Util:
+#
+
+void
+weaken(sv)
+	SV *sv
+PROTOTYPE: $
+CODE:
+#ifdef SvWEAKREF
+	sv_rvweaken(sv);
+#else
+	croak("weak references are not implemented in this release of perl");
+#endif
+
+
+
+void
+isweak(sv)
+	SV *sv
+PROTOTYPE: $
+CODE:
+#ifdef SvWEAKREF
+	ST(0) = boolSV(SvROK(sv) && SvWEAKREF(sv));
+	XSRETURN(1);
+#else
+	croak("weak references are not implemented in this release of perl");
+#endif
 
 
 

@@ -13,33 +13,45 @@
 package Hash::NoRef ;
 use 5.006 ;
 
-use strict qw(vars);
+use strict qw(vars) ;
 
 use vars qw($VERSION @ISA) ;
 
-$VERSION = '0.01' ;
+$VERSION = '0.02' ;
 
 use DynaLoader ;
 @ISA = qw(DynaLoader) ;
 bootstrap Hash::NoRef $VERSION ;
 
+no warnings 'all' ;
+
 sub new {
+  shift ;
   my %hash ;
-  tie(%hash , 'Hash::NoRef') ;
+  tie(%hash , 'Hash::NoRef',@_) ;
   return \%hash ;
 }
 
 sub TIEHASH {
   my $class = shift ;
   my $this = bless({} , $class) ;
+  
+  if (@_) {
+    my %content = (@_) ;
+    foreach my $Key ( keys %content ) {
+      $this->STORE($Key , $content{$Key}) ;
+    }
+  }
+  
   return $this ;
 }
 
 sub FETCH {
   my $this = shift ;
   my $k = shift ;
-
-  if ( Hash::NoRef::SvREFCNT( $this->{$k} ) < 1 ) { return ;}
+  no warnings ;
+  
+  if ( !defined $this->{$k} ) { $this->DELETE($k) ;}
   
   return $this->{$k} ;
 }
@@ -47,10 +59,11 @@ sub FETCH {
 sub STORE {
   my $this = shift ;
   my $k = shift ;
+  no warnings ;
   
-  $this->{$k} = $_[0] ;
+  $this->{$k} = $_[0] ;  
 
-  if ( ref($_[0]) ) { Hash::NoRef::SvREFCNT_dec($_[0]) ;}
+  if ( ref($_[0]) ) { weaken( $this->{$k} ) ;}
 
   return $this->{$k} ;
 }
@@ -58,17 +71,22 @@ sub STORE {
 sub EXISTS {
   my $this = shift ;
   my $k = shift ;
+  no warnings ;
+  if ( !defined $this->{$k} ) { $this->DELETE($k) ;}
   return exists $this->{$k} ;
 }
 
 sub DELETE {
   my $this = shift ;
   my $k = shift ;
+  my $no_check_alive = shift ;
+  no warnings ;
   return delete $this->{$k} ;
 }
 
 sub CLEAR {
   my $this = shift ;
+  no warnings ;
   return %{$this} = () ;
 }
 
@@ -86,18 +104,8 @@ sub NEXTKEY {
 sub UNTIE { &DESTROY }
 
 sub DESTROY {
-  my $this = shift ;
-  
   no warnings ;
-  
-  foreach my $k ( keys %{$this} ) {
-    if ( Hash::NoRef::SvREFCNT( $this->{$k} ) > 0 && ref( $this->{$k} ) ) {
-      Hash::NoRef::SvREFCNT_inc( $this->{$k} ) ;
-    }
-  }
-  
-  %{$this} = () ;
-  
+  &CLEAR ;
   return ;
 }
 
@@ -112,7 +120,7 @@ __END__
 
 =head1 NAME
 
-Hash::NoRef - A HASH that store values without increse the reference count.
+Hash::NoRef - A HASH that store values without increse the reference count (weak references).
 
 =head1 DESCRIPTION
 
@@ -124,6 +132,13 @@ reference in this HASH won't count.
 
   use Hash::NoRef ;
 
+  my %hash ;
+  tie(%hash , 'Hash::NoRef') ;
+
+  ...
+  
+  ## Or getting a HASH ref tied:
+
   my $hash = new Hash::NoRef() ;
   
   {
@@ -132,6 +147,9 @@ reference in this HASH won't count.
     ## When we exit this block $obj will be destroied,
     ## even with it stored in $hash->{obj}
   }
+  
+  $hash->{obj} ## is undef now!
+
 
 =head1 FUNTIONS
 
@@ -140,18 +158,6 @@ reference in this HASH won't count.
 Return the reference count of a reference.
 If a reference is not paste it will return -1.
 Dead references will return 0.
-
-Note that internally we make -1 to the reference count:
-
-  RETVAL = SvREFCNT(sv) - 1 ;
-
-Since when we make \$var we are actually creating a reference.
-So, for objects or reference to anonymous SCALAR, ARRAY, HASH, it will return 0.
-To avoid that alwasy paste creating a reference:
-
-  my $hash = {} ;
-  print Hash::NoRef::SvREFCNT( $hash ) ; ## returns 0
-  print Hash::NoRef::SvREFCNT( \%$hash ) ; ## returns 1
 
 =head2 SvREFCNT_inc ( REF )
 
@@ -171,7 +177,7 @@ Decrease the reference count.
 
 =head1 SEE ALSO
 
-L<Spy>, L<Devel::Peek>, L<Safe::World>.
+L<Spy>, L<Devel::Peek>, L<Scalar::Util>, L<Safe::World>.
 
 =head1 AUTHOR
 
