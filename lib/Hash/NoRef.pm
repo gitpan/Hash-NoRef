@@ -17,7 +17,7 @@ use strict qw(vars) ;
 
 use vars qw($VERSION @ISA) ;
 
-$VERSION = '0.02' ;
+$VERSION = '0.03' ;
 
 use DynaLoader ;
 @ISA = qw(DynaLoader) ;
@@ -120,11 +120,11 @@ __END__
 
 =head1 NAME
 
-Hash::NoRef - A HASH that store values without increse the reference count (weak references).
+Hash::NoRef - A HASH that store values without increase the reference count (weak references).
 
 =head1 DESCRIPTION
 
-This HASH will store it's values without increse the reference count.
+This HASH will store it's values without increase the reference count.
 This can be used to store objects but without interfere in the DESTROY mechanism, since the
 reference in this HASH won't count.
 
